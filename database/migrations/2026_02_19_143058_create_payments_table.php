@@ -1,5 +1,4 @@
 <?php
-// database/migrations/2024_01_01_000007_create_payments_table.php
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -11,11 +10,11 @@ return new class extends Migration
     {
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('order_id')->constrained()->onDelete('cascade');
-            $table->foreignId('user_id')->constrained();
+            $table->foreignId('order_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->decimal('amount', 12, 2);
-            $table->string('method')->default('cash'); // cash, transfer, qris, etc
-            $table->string('reference')->nullable(); // transfer reference, etc
+            $table->string('method')->default('cash');
+            $table->string('reference')->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
         });
