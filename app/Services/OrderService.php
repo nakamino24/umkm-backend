@@ -3,10 +3,11 @@
 
 namespace App\Services;
 
+use App\Http\Resources\OrderResource;
+use App\Repositories\CustomerRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\ProductRepository;
-use App\Repositories\CustomerRepository;
-use App\Http\Resources\OrderResource;
+use Illuminate\Support\Facades\DB;
 
 class OrderService
 {
@@ -33,44 +34,64 @@ class OrderService
     public function create(int $userId, array $data): OrderResource
     {
         $product = $this->productRepository->findOrFail($data['product_id']);
+        $customer = $this->customerRepository->findOrFail($data['customer_id']);
 
-        // Check stock
-        if ($product->stock < $data['quantity']) {
+        if ((int) $product->user_id !== $userId || (int) $customer->user_id !== $userId) {
+            throw new \Exception('Unauthorized', 403);
+        }
+
+        if (! $product->canFulfillOrder((int) $data['quantity'])) {
             throw new \Exception('Stok tidak mencukupi', 400);
         }
 
-        $totalPrice = $product->price * $data['quantity'];
+        $order = DB::transaction(function () use ($userId, $data, $product, $customer) {
+            $quantity = (int) $data['quantity'];
+            $price = (float) $product->price;
+            $subtotal = $price * $quantity;
 
-        $orderData = [
-            'user_id' => $userId,
-            'customer_id' => $data['customer_id'],
-            'product_id' => $data['product_id'],
-            'quantity' => $data['quantity'],
-            'total_price' => $totalPrice,
-            'status' => $data['status'] ?? 'pending',
-            'notes' => $data['notes'] ?? null
-        ];
+            $order = $this->orderRepository->create([
+                'user_id' => $userId,
+                'customer_id' => $customer->id,
+                'status' => $data['status'] ?? 'pending',
+                'notes' => $data['notes'] ?? null,
+                'subtotal' => $subtotal,
+                'total_price' => $subtotal,
+            ]);
 
-        $order = $this->orderRepository->create($orderData);
+            $order->items()->create([
+                'product_id' => $product->id,
+                'product_name' => $product->name,
+                'product_sku' => $product->sku,
+                'quantity' => $quantity,
+                'price' => $price,
+                'cost_price' => $product->cost_price,
+                'subtotal' => $subtotal,
+            ]);
 
-        // Update stock
-        $this->productRepository->decrementStock($data['product_id'], $data['quantity']);
+            $this->productRepository->decrementStock($product->id, $quantity);
+            $this->customerRepository->updateStats($customer->id, $subtotal);
 
-        // Update customer stats
-        $this->customerRepository->updateStats($data['customer_id'], $totalPrice);
+            return $order;
+        });
 
-        return new OrderResource($order->load(['customer', 'product']));
+        return new OrderResource($order->load(['customer', 'items.product']));
     }
 
     public function updateStatus(int $id, int $userId, string $status): OrderResource
     {
         $order = $this->orderRepository->findOrFail($id);
 
-        if ($order->user_id !== $userId) {
+        if ((int) $order->user_id !== $userId) {
             throw new \Exception('Unauthorized', 403);
         }
 
-        $order->update(['status' => $status]);
-        return new OrderResource($order->fresh()->load(['customer', 'product']));
+        $payload = ['status' => $status];
+        if ($status === 'completed' && empty($order->completed_at)) {
+            $payload['completed_at'] = now();
+        }
+
+        $order->update($payload);
+
+        return new OrderResource($order->fresh()->load(['customer', 'items.product']));
     }
 }

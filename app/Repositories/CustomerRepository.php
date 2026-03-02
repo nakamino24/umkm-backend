@@ -22,5 +22,6 @@ class CustomerRepository extends BaseRepository
         $customer = $this->findOrFail($customerId);
         $customer->increment('total_orders');
         $customer->increment('total_spent', $amount);
+        $customer->update(['last_order_at' => now()]);
     }
 }
