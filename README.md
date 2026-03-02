@@ -23,10 +23,14 @@ API berjalan di `http://localhost:8000`.
 ## Endpoint penting
 
 - `GET /api/health` → health check backend
-- `POST /api/register` → register user
-- `POST /api/login` → login user
+- `POST /api/auth/register` → register user (primary)
+- `POST /api/auth/login` → login user (primary)
+- `GET /api/auth/me` → profil user login
+- `POST /api/auth/logout` → logout
 
 Endpoint yang membutuhkan autentikasi menggunakan `auth:sanctum` token.
+
+Alias lama tetap tersedia untuk kompatibilitas: `/api/register`, `/api/login`, `/api/user`, `/api/logout`.
 
 ## Konfigurasi frontend + CORS
 
