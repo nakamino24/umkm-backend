@@ -11,22 +11,27 @@ Route::get('/health', fn () => response()->json([
     'message' => 'API is running',
 ]));
 
-// Public routes
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
-
-// Backward-compatible auth routes
+// Auth routes (primary pattern)
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/logout', [AuthController::class, 'logout']);
+        Route::get('/me', [AuthController::class, 'user']);
+    });
+});
+
+// Backward-compatible auth aliases
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/user', [AuthController::class, 'user']);
 });
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
-    // Auth
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/user', [AuthController::class, 'user']);
-
     // Dashboard
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
 
